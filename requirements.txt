@@ -1,5 +1,0 @@
-Flask 
-google-generativeai 
-pypdf 
-numpy 
-scikit-learn
