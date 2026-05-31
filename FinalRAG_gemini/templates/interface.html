@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 文件智能問答助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <div class="md:col-span-1 flex flex-col space-y-6">
+            
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                <div class="mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">1. 上傳文件</h2>
+                    <p class="text-xs text-gray-500 mt-1">請先上傳 PDF 以啟用問答功能</p>
+                </div>
+
+                <form id="uploadForm" onsubmit="handleUploadSubmit(event)">
+                    <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/30 transition-all duration-200 group">
+                        <input type="file" id="fileInput" name="pdfFile" accept=".pdf" class="hidden">
+                        <svg class="mx-auto h-10 w-10 text-gray-400 group-hover:text-blue-500 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <p class="mt-3 text-xs font-medium text-gray-700">拖曳檔案至此，或 <span class="text-blue-600 hover:underline">瀏覽</span></p>
+                        <p class="mt-1 text-[10px] text-gray-400">僅支援 PDF 格式</p>
+                    </div>
+
+                    <div id="fileInfo" class="hidden mt-4 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center space-x-2 overflow-hidden">
+                            <svg class="h-7 w-7 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div class="truncate">
+                                <p id="fileName" class="text-xs font-medium text-gray-800 truncate">filename.pdf</p>
+                                <p id="fileSize" class="text-[10px] text-gray-500">0 KB</p>
+                            </div>
+                        </div>
+                        <button type="button" id="removeBtn" class="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-gray-100">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+
+                    <p id="errorMsg" class="hidden text-xs text-red-500 mt-2 text-center"></p>
+                    <button type="submit" id="uploadBtn" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl transition-colors duration-200 text-sm shadow-sm">分析文件</button>
+                </form>
+            </div>
+
+            <div id="dashboardSection" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex-1">
+                <div class="mb-4">
+                    <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider">📊 文件分析面板</h3>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 mb-5">
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <p class="text-[10px] text-gray-400 font-medium">提取總字元數</p>
+                        <p id="statChars" class="text-lg font-bold text-gray-700 mt-0.5">0</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <p class="text-[10px] text-gray-400 font-medium">預估 Token 數</p>
+                        <p id="statTokens" class="text-lg font-bold text-gray-700 mt-0.5">0</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-4">
+                    <h4 class="text-xs font-semibold text-gray-600 mb-2">💡 快捷文獻導讀問題</h4>
+                    <div class="flex flex-col space-y-1.5">
+                        <button onclick="quickQuestion('請用繁體中文簡短摘要這份文件的核心大綱。')" class="quick-btn text-left text-xs bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-600 px-3 py-2 rounded-lg transition-all border border-gray-200/60 cursor-not-allowed" disabled>
+                            📝 一鍵總結章節大綱
+                        </button>
+                        <button onclick="quickQuestion('這份文件裡面有哪些核心的重要觀念或專有名詞？請列點解釋。')" class="quick-btn text-left text-xs bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-600 px-3 py-2 rounded-lg transition-all border border-gray-200/60 cursor-not-allowed" disabled>
+                            🔑 提取關鍵名詞與核心觀念
+                        </button>
+                        <button onclick="quickQuestion('請幫我找出這份文件裡最值得注意的 3 個重點結論。')" class="quick-btn text-left text-xs bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-600 px-3 py-2 rounded-lg transition-all border border-gray-200/60 cursor-not-allowed" disabled>
+                            🎯 篩選文件重要結論
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="md:col-span-2 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 h-[calc(100vh-4rem)] min-h-[500px]">
+            <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 rounded-t-2xl">
+                <div>
+                    <h3 class="font-bold text-gray-800">2. AI 文件助理</h3>
+                    <p id="systemStatus" class="text-xs text-gray-400 flex items-center mt-0.5">
+                        <span class="w-2 h-2 rounded-full bg-gray-300 mr-1.5 inline-block"></span>請先上傳 PDF 文件
+                    </p>
+                </div>
+            </div>
+
+            <div id="chatHistory" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50/30">
+                <div class="flex space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs flex-shrink-0">AI</div>
+                    <div class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 text-sm text-gray-700 max-w-[85%]">
+                        你好！請在左側上傳 PDF 檔案，上傳完成後我就可以回答關於該文件的任何問題囉！
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-100 bg-white rounded-b-2xl">
+                <form id="chatForm" onsubmit="handleChatSubmit(event)" class="flex space-x-2">
+                    <input type="text" id="userInput" disabled class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm bg-gray-100 cursor-not-allowed focus:outline-none focus:border-blue-500 focus:bg-white transition-all" placeholder="請先上傳文件再輸入問題...">
+                    <button type="submit" id="sendBtn" disabled class="bg-gray-300 text-gray-500 px-4 py-2 rounded-xl text-sm font-medium cursor-not-allowed hover:bg-blue-600 hover:text-white transition-colors duration-200 flex items-center space-x-1">
+                        <span>發送</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeBtn = document.getElementById('removeBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const systemStatus = document.getElementById('systemStatus');
+        const chatHistory = document.getElementById('chatHistory');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        
+        // 新增的面板元素
+        const statChars = document.getElementById('statChars');
+        const statTokens = document.getElementById('statTokens');
+        const quickBtns = document.querySelectorAll('.quick-btn');
+
+        let isFileUploaded = false;
+
+        dropZone.addEventListener('click', () => { if(!isFileUploaded) fileInput.click(); });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            const file = files[0];
+            if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
+                showError('錯誤：只能上傳 PDF 格式的檔案！');
+                clearFile();
+                return;
+            }
+            hideError();
+            fileInput.files = files;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatBytes(file.size);
+            fileInfo.classList.remove('hidden');
+        }
+
+        function clearFile() {
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            resetSystem();
+        }
+
+        removeBtn.addEventListener('click', (e) => { e.stopPropagation(); clearFile(); });
+
+        async function handleUploadSubmit(event) {
+            event.preventDefault();
+            if (fileInput.files.length === 0) {
+                showError('請先選取或拖曳一個 PDF 檔案。');
+                return;
+            }
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = "正在分析文件...";
+            uploadBtn.className = "mt-4 w-full bg-gray-400 text-white font-medium py-2 px-4 rounded-xl text-sm cursor-not-allowed";
+
+            const formData = new FormData();
+            formData.append('pdfFile', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    isFileUploaded = true;
+                    uploadBtn.textContent = "文件分析完成";
+                    uploadBtn.className = "mt-4 w-full bg-green-600 text-white font-medium py-2 px-4 rounded-xl text-sm cursor-default";
+                    systemStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 mr-1.5 inline-block animate-pulse"></span>已讀取：${fileInput.files[0].name}`;
+                    
+                    userInput.disabled = false;
+                    userInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
+                    userInput.placeholder = "請輸入關於此文件的問題...";
+                    sendBtn.disabled = false;
+                    sendBtn.classList.remove('bg-gray-300', 'text-gray-500', 'cursor-not-allowed');
+
+                    // 💡 更新左下角面板統計數據 (從後端回應中抓取字元數計算)
+                    const charCount = result.message.match(/\d+/)[0] || 0;
+                    statChars.textContent = parseInt(charCount).toLocaleString();
+                    statTokens.textContent = Math.round(charCount / 2).toLocaleString(); // 估算 Token 數 (中英綜合約 1 token = 2 字元)
+                    
+                    // 啟用快捷按鈕
+                    quickBtns.forEach(btn => {
+                        btn.disabled = false;
+                        btn.classList.remove('cursor-not-allowed', 'bg-gray-50');
+                    });
+                    
+                    appendMessage('AI', `成功讀取《${fileInput.files[0].name}》！我已經掌握了文件內容，請問你想了解什麼？`);
+                } else {
+                    showError(result.message);
+                    resetSystem();
+                }
+            } catch (err) {
+                showError('連線至後端伺服器失敗。');
+                resetSystem();
+            }
+        }
+
+        async function handleChatSubmit(event) {
+            event.preventDefault();
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            appendMessage('User', text);
+            userInput.value = '';
+            const loadingId = appendLoadingMessage();
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: text })
+                });
+                const result = await response.json();
+                removeLoadingMessage(loadingId);
+
+                if (result.success) {
+                    appendMessage('AI', result.answer);
+                } else {
+                    appendMessage('AI', `❌ 錯誤: ${result.message}`);
+                }
+            } catch (err) {
+                removeLoadingMessage(loadingId);
+                appendMessage('AI', '❌ 無法連線至伺服器，請稍後再試。');
+            }
+        }
+
+        // 💡 點擊快捷問題時觸發的 JavaScript 函數
+        function quickQuestion(text) {
+            userInput.value = text;
+            chatForm.dispatchEvent(new Event('submit')); // 自動發送表單
+        }
+
+        function resetSystem() {
+            isFileUploaded = false;
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = "分析文件";
+            uploadBtn.className = "mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl text-sm shadow-sm";
+            systemStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-gray-300 mr-1.5 inline-block"></span>請先上傳 PDF 文件`;
+            userInput.disabled = true;
+            userInput.classList.add('bg-gray-100', 'cursor-not-allowed');
+            userInput.placeholder = "請先上傳文件再輸入問題...";
+            sendBtn.disabled = true;
+            sendBtn.classList.add('bg-gray-300', 'text-gray-500', 'cursor-not-allowed');
+            
+            // 重置面板
+            statChars.textContent = '0';
+            statTokens.textContent = '0';
+            quickBtns.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add('cursor-not-allowed', 'bg-gray-50');
+            });
+        }
+
+        function appendMessage(sender, text) {
+            const isUser = sender === 'User';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex space-x-3 ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`;
+            const avatarHtml = isUser 
+                ? `<div class="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-xs flex-shrink-0">你</div>`
+                : `<div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs flex-shrink-0">AI</div>`;
+            const contentHtml = `<div class="${isUser ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-100'} p-3 rounded-2xl shadow-sm text-sm max-w-[85%] break-all">${text.replace(/\n/g, '<br>')}</div>`;
+            msgDiv.innerHTML = avatarHtml + contentHtml;
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function appendLoadingMessage() {
+            const id = 'loading-' + Date.now();
+            const msgDiv = document.createElement('div');
+            msgDiv.id = id;
+            msgDiv.className = "flex space-x-3";
+            msgDiv.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs flex-shrink-0">AI</div>
+                <div class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 text-sm text-gray-400 max-w-[85%] flex items-center space-x-1">
+                    <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                    <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                    <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                </div>`;
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            return id;
+        }
+
+        function removeLoadingMessage(id) { const el = document.getElementById(id); if (el) el.remove(); }
+        function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.remove('hidden'); }
+        function hideError() { errorMsg.classList.add('hidden'); }
+        function formatBytes(bytes) { if (bytes === 0) return '0 Bytes'; const k = 1024, sizes = ['Bytes', 'KB', 'MB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; }
+    </script>
+</body>
+</html>
